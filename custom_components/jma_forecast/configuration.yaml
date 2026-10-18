@@ -1,0 +1,10 @@
+sensor:
+  - &jma
+    platform: jma_forecast
+    center: "010500"
+    office: "150000"
+    area: "150020"
+    station: "54501"
+
+weather:
+  - *jma
