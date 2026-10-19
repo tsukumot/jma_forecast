@@ -87,7 +87,6 @@ def current_value(data, key, now):
     return value
 
 def fetch_offices():
-    #with urllib.request.urlopen(AREA_JSON, timeout=30) as r:
     with open(_AREA_FILE, encoding="utf-8") as r:
         j = json.load(r)
     return j["centers"], j["offices"]
