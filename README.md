@@ -1,4 +1,4 @@
-# JMA Forecast in Home Assistant
+# JMA Forecast for Home Assistant
 
 気象庁の「府県天気予報（Ｒ１）電文」を使い、天気・気温・風の予報をHome Assistantに表示するカスタム統合です。
 
@@ -18,11 +18,6 @@
 1. HACS → 右上のメニュー → **カスタムリポジトリ**
 2. リポジトリに `https://github.com/tsukumot/jma_forecast`、種類に **Integration** を指定して追加
 3. 「JMA Forecast」をダウンロードし、Home Assistant を再起動
-
-### 手動
-
-1. このリポジトリの内容を `config/custom_components/jma_forecast/` にコピー
-2. Home Assistantを再起動
 
 ## 設定
 
@@ -70,7 +65,7 @@
 - 予報は3時間ごとです。`forecast_hourly` には、現在の3時間前以降の枠がそのまま入ります（1時間ごとに補間はしません）。
 - 風速は、電文の風速レベルの範囲（下限・上限）の平均値を m/s として扱います。
 - 日没後かどうかの判定は、天気エンティティの現在値では `sun.sun`、`forecast_hourly` では 18時〜6時 の簡易判定です。
-- 地方・府県予報区の一覧は同梱の `area.json` から読み込みます。気象庁側の区域改定があった場合、このファイルの差し替えが必要です。[オリジナル](https://www.jma.go.jp/bosai/common/const/area.json)は気象庁のJSONです。
+- 地方・府県予報区の一覧は同梱の `area.json` から読み込みます。気象庁側の区域改定があった場合、このファイルの差し替えが必要です。
 - 電文の発表間隔や内容は気象庁の運用に依存します。
 
 ## ライセンス・出典
