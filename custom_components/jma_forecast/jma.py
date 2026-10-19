@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 _AREA_FILE = Path(__file__).parent / AREA_JSON
 
 NS = {"a": "http://www.w3.org/2005/Atom"}
-_cache = {"url": None, "data": {}}
+_cache = {}
 
 
 def _open(url):
@@ -62,14 +62,17 @@ def _parse(url, area, station):
             if "weather" in v and "temp" in v}
 
 def fetch_latest(office, area, station):
+    key = (office, area, station)
+    entry = _cache.setdefault(key, {"url": None, "data": {}})
+
     url = _latest_url(office)
     _LOGGER.debug("jma url=%s", url)
-    if url and url != _cache["url"]:
+    if url and url != entry["url"]:
         data = _parse(url, area, station)
         if data:  # 空のときは保存せず、次回また試す
-            _cache["data"] = data
-            _cache["url"] = url
-    return _cache["data"]
+            entry["data"] = data
+            entry["url"] = url
+    return entry["data"]
 
 
 from datetime import datetime
