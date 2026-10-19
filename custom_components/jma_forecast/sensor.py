@@ -23,19 +23,6 @@ async def async_setup_entry(hass, entry, async_add_entities):
         JmaWeather(coord, area, entry),
     ])
 
-    async def update():
-        return await hass.async_add_executor_job(
-            fetch_latest, office, area, station)
-
-    coord = DataUpdateCoordinator(
-        hass, _LOGGER, name="jma_forecast", config_entry=entry,
-        update_method=update, update_interval=timedelta(minutes=10))
-    await coord.async_config_entry_first_refresh()
-    async_add_entities([
-        JmaTemp(coord, station, entry),
-        JmaWeather(coord, area, entry),
-    ])
-
 
 class _Base(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
