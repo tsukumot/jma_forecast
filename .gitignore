@@ -1,0 +1,6 @@
+*.pyc
+*.tar.gz
+build/*
+dist/*
+.DS_Store
+__pycache__
