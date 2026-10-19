@@ -60,7 +60,7 @@ class JmaTemp(_Base):
 
     def __init__(self, coord, station, entry):
         super().__init__(coord, entry)
-        self._attr_unique_id = f"jma_temp_{station}"
+        self._attr_unique_id = f"{entry.entry_id}_temp"  # ← ここだけ変更
 
     @property
     def native_value(self):
@@ -72,7 +72,7 @@ class JmaWeather(_Base):
 
     def __init__(self, coord, area, entry):
         super().__init__(coord, entry)
-        self._attr_unique_id = f"jma_weather_{area}"
+        self._attr_unique_id = f"{entry.entry_id}_weather"  # ← ここだけ変更
 
     @property
     def native_value(self):

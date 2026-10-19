@@ -73,10 +73,10 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
 
     def __init__(self, coord, area, entry):
         super().__init__(coord)
-        self._attr_unique_id = f"jma_weather_entity_{area}"
+        self._attr_unique_id = f"{entry.entry_id}_forecast"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name="JMA 予報",
+            name=entry.title,
             manufacturer="気象庁",
             entry_type=DeviceEntryType.SERVICE,
         )
