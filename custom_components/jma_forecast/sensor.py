@@ -1,18 +1,12 @@
 import logging
-from datetime import timedelta
-
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity, DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
-
-from .jma import fetch_latest, current_value
+from .jma import current_value
 from .const import (
     DOMAIN,
-    CONF_OFFICE,
     CONF_AREA,
     CONF_STATION,
 )
@@ -21,8 +15,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
+    coord = hass.data[DOMAIN][entry.entry_id]
     c = entry.data
-    office, area, station = c[CONF_OFFICE], c[CONF_AREA], c[CONF_STATION]
+    area, station = c[CONF_AREA], c[CONF_STATION]
+    async_add_entities([
+        JmaTemp(coord, station, entry),
+        JmaWeather(coord, area, entry),
+    ])
 
     async def update():
         return await hass.async_add_executor_job(
