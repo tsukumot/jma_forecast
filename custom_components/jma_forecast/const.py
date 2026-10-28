@@ -12,3 +12,5 @@ CONF_CENTER = "center"
 CONF_OFFICE = "office"
 CONF_AREA = "area"
 CONF_STATION = "station"
+
+DAILY_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/{office}.json"

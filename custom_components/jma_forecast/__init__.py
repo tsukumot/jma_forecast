@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN, CONF_OFFICE, CONF_AREA, CONF_STATION
-from .jma import fetch_latest
+from .jma import fetch_latest, fetch_daily
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,8 +18,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     office, area, station = c[CONF_OFFICE], c[CONF_AREA], c[CONF_STATION]
 
     async def update():
-        return await hass.async_add_executor_job(
+        hourly = await hass.async_add_executor_job(
             fetch_latest, office, area, station)
+        daily = await hass.async_add_executor_job(
+            fetch_daily, office, area, station)
+        return {"hourly": hourly, "daily": daily}
 
     coord = DataUpdateCoordinator(
         hass, _LOGGER, name=f"jma_forecast_{office}_{area}_{station}",
@@ -39,3 +42,4 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     if ok:
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return ok
+

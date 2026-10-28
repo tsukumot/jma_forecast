@@ -7,9 +7,10 @@ from .const import (
     FEED,
     PRODUCT,
     AREA_JSON,
+    DAILY_URL,
     TYPE_WEATHER,
     TYPE_WIND,
-    TYPE_TEMP
+    TYPE_TEMP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -108,3 +109,103 @@ def list_choices(office):
             if el is not None:
                 dest[el.find("{*}Code").text] = el.find("{*}Name").text
     return areas, stations
+
+
+#週間予報
+_daily_cache = {}
+
+
+def _pick(areas, code, fallback=True):
+    """codeが一致する区域を返す。なければ先頭(fallback=Falseならなし)。"""
+    for a in areas:
+        if a["area"]["code"] == code:
+            return a
+    return areas[0] if (fallback and areas) else None
+
+
+def _num(values, i):
+    """配列のi番目を数値にする。空文字・範囲外はNone。"""
+    try:
+        return float(values[i])
+    except (IndexError, ValueError, TypeError):
+        return None
+
+
+def _weekly_days(j, office, station):
+    """週間予報(j[1])から、日付ごとの値を作る。"""
+    series = j[1]["timeSeries"]
+    w = _pick(series[0]["areas"], office)
+    t = _pick(series[1]["areas"], station)
+    days = {}
+    for i, d in enumerate(series[0]["timeDefines"]):
+        days[d[:10]] = {
+            "weather_code": w["weatherCodes"][i] if w else None,
+            "pop": _num(w["pops"], i) if w else None,
+            "temp_max": _num(t["tempsMax"], i) if t else None,
+            "temp_min": _num(t["tempsMin"], i) if t else None,
+        }
+    return days
+
+
+def _short_days(j, area, station):
+    """3日分の予報(j[0])から、日付ごとの値を作る。見つかった項目だけ入れる。"""
+    series = j[0]["timeSeries"]
+    days = {}
+
+    # 天気コード(一次細分区域ごと)
+    w = _pick(series[0]["areas"], area, fallback=False)
+    if w:
+        for i, d in enumerate(series[0]["timeDefines"]):
+            days.setdefault(d[:10], {})["weather_code"] = w["weatherCodes"][i]
+
+    # 降水確率(6時間ごと) → その日の最大値
+    p = _pick(series[1]["areas"], area, fallback=False)
+    if p:
+        pops = {}
+        for d, v in zip(series[1]["timeDefines"], p["pops"]):
+            if v != "":
+                pops.setdefault(d[:10], []).append(float(v))
+        for day, vals in pops.items():
+            days.setdefault(day, {})["pop"] = max(vals)
+
+    # 気温(地点ごと): 時刻や並び順は信用せず、日付ごとに集めて大小で判断する
+    t = _pick(series[2]["areas"], station)
+    if t:
+        temps = {}
+        for d, v in zip(series[2]["timeDefines"], t["temps"]):
+            if v != "":
+                temps.setdefault(d[:10], []).append(float(v))
+        for day, vals in temps.items():
+            if len(vals) >= 2:
+                entry = days.setdefault(day, {})
+                entry["temp_min"] = min(vals)
+                entry["temp_max"] = max(vals)
+    return days
+
+
+def _parse_daily(j, office, area, station):
+    days = _weekly_days(j, office, station)
+    # 3日分の予報で見つかった項目は、週間予報の値を上書きする
+    for day, vals in _short_days(j, area, station).items():
+        days.setdefault(day, {}).update(vals)
+    return [{
+        "datetime": f"{day}T00:00:00+09:00",
+        "weather_code": v.get("weather_code"),
+        "pop": v.get("pop"),
+        "temp_max": v.get("temp_max"),
+        "temp_min": v.get("temp_min"),
+    } for day, v in sorted(days.items())]
+
+
+def fetch_daily(office, area, station):
+    key = (office, area, station)
+    url = DAILY_URL.format(office=office)
+    try:
+        with urllib.request.urlopen(url, timeout=30) as r:
+            j = json.load(r)
+        days = _parse_daily(j, office, area, station)
+        if days:
+            _daily_cache[key] = days
+    except Exception as err:  # 失敗しても3時間予報は止めない
+        _LOGGER.warning("jma daily fetch failed: %s", err)
+    return _daily_cache.get(key, [])

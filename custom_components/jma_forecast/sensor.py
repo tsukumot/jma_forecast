@@ -37,8 +37,8 @@ class _Base(CoordinatorEntity, SensorEntity):
         )
 
     def _current(self, key):
-        return current_value(self.coordinator.data, key, dt_util.now())
-
+        hourly = (self.coordinator.data or {}).get("hourly")
+        return current_value(hourly, key, dt_util.now())
 
 class JmaTemp(_Base):
     _attr_name = "気温予報"

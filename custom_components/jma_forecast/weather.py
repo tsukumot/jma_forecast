@@ -18,6 +18,9 @@ _LOGGER = logging.getLogger(__name__)
 _BEARING = {"北": 0, "北東": 45, "東": 90, "南東": 135,
             "南": 180, "南西": 225, "西": 270, "北西": 315}
 
+# 天気コードの先頭1桁 → condition
+_CODE_COND = {"1": "sunny", "2": "cloudy", "3": "rainy", "4": "snowy"}
+
 
 def _condition(text, night):
     if not text:
@@ -46,14 +49,6 @@ def _speed(rng):
         return None
     return sum(nums) / len(nums) if nums else None
 
-def _speed_range(rng):
-    try:
-        nums = [float(x) for x in (rng or "").split()]
-    except ValueError:
-        return None, None
-    if not nums:
-        return None, None
-    return min(nums), max(nums)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coord = hass.data[DOMAIN][entry.entry_id]
@@ -67,9 +62,8 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     _attr_attribution = "出典: 気象庁"
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND
-    _attr_supported_features = WeatherEntityFeature.FORECAST_HOURLY
-    # 長い予報リストをrecorder(履歴DB)に保存しない
-    _unrecorded_attributes = frozenset({"forecast_3h"})
+    _attr_supported_features = (WeatherEntityFeature.FORECAST_HOURLY
+                                | WeatherEntityFeature.FORECAST_DAILY)
 
     def __init__(self, coord, area, entry):
         super().__init__(coord)
@@ -81,8 +75,12 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
             entry_type=DeviceEntryType.SERVICE,
         )
 
+    @property
+    def _hourly(self):
+        return (self.coordinator.data or {}).get("hourly") or {}
+
     def _cur(self, key):
-        return current_value(self.coordinator.data, key, dt_util.now())
+        return current_value(self._hourly, key, dt_util.now())
 
     @property
     def condition(self):
@@ -101,33 +99,10 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     def wind_bearing(self):
         return _BEARING.get(self._cur("wind_dir"))
 
-    @property
-    def extra_state_attributes(self):
-        now = dt_util.now()
-        slots = []
-        for t, v in (self.coordinator.data or {}).items():
-            if datetime.fromisoformat(t) < now - timedelta(hours=3):
-                continue
-            lo, hi = _speed_range(v.get("wind_speed_ms"))
-            av = _speed(v.get("wind_speed_ms"))
-            slots.append({
-                "datetime": t,
-                "weather": v.get("weather"),
-                "temperature": v.get("temp"),
-                "wind_direction": v.get("wind_dir"),
-                "wind_speed_min": lo,
-                "wind_speed_max": hi,
-                "wind_speed_average": av,
-            })
-        return {
-            "weather_text": self._cur("weather"),
-            "forecast_3h": slots,
-        }
-
     async def async_forecast_hourly(self):
         now = dt_util.now()
         out = []
-        for t, v in (self.coordinator.data or {}).items():
+        for t, v in self._hourly.items():
             dt = datetime.fromisoformat(t)
             if dt < now - timedelta(hours=3):
                 continue
@@ -141,7 +116,41 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
             })
         return out
 
+    def _hourly_range(self):
+        """3時間予報から、日付ごとの (最低, 最高) 気温を作る。"""
+        temps = {}
+        for t, v in self._hourly.items():
+            if v.get("temp") is None:
+                continue
+            day = datetime.fromisoformat(t).date()
+            temps.setdefault(day, []).append(v["temp"])
+        return {day: (min(vals), max(vals)) for day, vals in temps.items()}
+
+    async def async_forecast_daily(self):
+        ranges = self._hourly_range()
+        out = []
+        for d in (self.coordinator.data or {}).get("daily") or []:
+            code = d.get("weather_code") or ""
+            tmax, tmin = d.get("temp_max"), d.get("temp_min")
+            # 週間予報に値がない日は、3時間予報の範囲で補う
+            day = datetime.fromisoformat(d["datetime"]).date()
+            if day in ranges:
+                low, high = ranges[day]
+                if tmax is None:
+                    tmax = high
+                if tmin is None:
+                    tmin = low
+            out.append({
+                "datetime": d["datetime"],
+                "condition": _CODE_COND.get(code[:1]),
+                "native_temperature": tmax,
+                "native_templow": tmin,
+                "precipitation_probability": d.get("pop"),
+            })
+        return out
+
     @callback
     def _handle_coordinator_update(self):
         super()._handle_coordinator_update()
-        self.hass.async_create_task(self.async_update_listeners(("hourly",)))
+        self.hass.async_create_task(
+            self.async_update_listeners(("hourly", "daily")))
