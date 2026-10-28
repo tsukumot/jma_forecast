@@ -46,6 +46,14 @@ def _speed(rng):
         return None
     return sum(nums) / len(nums) if nums else None
 
+def _speed_range(rng):
+    try:
+        nums = [float(x) for x in (rng or "").split()]
+    except ValueError:
+        return None, None
+    if not nums:
+        return None, None
+    return min(nums), max(nums)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coord = hass.data[DOMAIN][entry.entry_id]
@@ -60,6 +68,8 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND
     _attr_supported_features = WeatherEntityFeature.FORECAST_HOURLY
+    # 長い予報リストをrecorder(履歴DB)に保存しない
+    _unrecorded_attributes = frozenset({"forecast_3h"})
 
     def __init__(self, coord, area, entry):
         super().__init__(coord)
@@ -90,6 +100,29 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     @property
     def wind_bearing(self):
         return _BEARING.get(self._cur("wind_dir"))
+
+    @property
+    def extra_state_attributes(self):
+        now = dt_util.now()
+        slots = []
+        for t, v in (self.coordinator.data or {}).items():
+            if datetime.fromisoformat(t) < now - timedelta(hours=3):
+                continue
+            lo, hi = _speed_range(v.get("wind_speed_ms"))
+            av = _speed(v.get("wind_speed_ms"))
+            slots.append({
+                "datetime": t,
+                "weather": v.get("weather"),
+                "temperature": v.get("temp"),
+                "wind_direction": v.get("wind_dir"),
+                "wind_speed_min": lo,
+                "wind_speed_max": hi,
+                "wind_speed_average": av,
+            })
+        return {
+            "weather_text": self._cur("weather"),
+            "forecast_3h": slots,
+        }
 
     async def async_forecast_hourly(self):
         now = dt_util.now()
