@@ -49,6 +49,15 @@ def _speed(rng):
         return None
     return sum(nums) / len(nums) if nums else None
 
+def _speed_range(rng):
+    """"3 5" -> (3.0, 5.0)。数値が1つなら下限=上限。取れなければ (None, None)"""
+    try:
+        nums = [float(x) for x in (rng or "").split()]
+    except ValueError:
+        return None, None
+    if not nums:
+        return None, None
+    return min(nums), max(nums)
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coord = hass.data[DOMAIN][entry.entry_id]
@@ -98,6 +107,29 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     @property
     def wind_bearing(self):
         return _BEARING.get(self._cur("wind_dir"))
+
+    @property
+    def extra_state_attributes(self):
+        now = dt_util.now()
+        slots = []
+        for t, v in self._hourly.items():
+            if datetime.fromisoformat(t) < now - timedelta(hours=3):
+                continue
+            lo, hi = _speed_range(v.get("wind_speed_ms"))
+            av = _speed(v.get("wind_speed_ms"))
+            slots.append({
+                "datetime": t,
+                "weather": v.get("weather"),
+                "temperature": v.get("temp"),
+                "wind_direction": v.get("wind_dir"),
+                "wind_speed_min": lo,
+                "wind_speed_max": hi,
+                "wind_speed_average": av,
+            })
+        return {
+            "weather_text": self._cur("weather"),
+            "forecast_3h": slots,
+        }
 
     async def async_forecast_hourly(self):
         now = dt_util.now()
