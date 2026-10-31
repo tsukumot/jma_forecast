@@ -5,16 +5,13 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectOptionDict
 )
-
 from .const import (
-    DOMAIN,
-    CONF_CENTER,
-    CONF_OFFICE,
-    CONF_AREA,
-    CONF_STATION,
+    DOMAIN, CONF_CENTER, CONF_OFFICE, CONF_AREA, CONF_STATION,
+    CONF_AMEDAS_MODE, CONF_AMEDAS_ID,
+    AMEDAS_HOME, AMEDAS_STATION, AMEDAS_NONE,
 )
 from .jma import fetch_offices, list_choices
-
+from .amedas import get_table
 
 def _select(options):
     return SelectSelector(SelectSelectorConfig(
@@ -30,6 +27,9 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._center = None
         self._office = None
         self._stations = {}
+        self._point = {}
+        self._mode = AMEDAS_NONE
+        self._amedas_id = None
 
     async def _load(self):
         if self._centers is None:
@@ -66,6 +66,8 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             uid = f"{self._office}_{user_input[CONF_AREA]}_{user_input[CONF_STATION]}"
             await self.async_set_unique_id(uid)
             self._abort_if_unique_id_configured()
+            self._point = user_input
+            return await self.async_step_amedas()
 
             title = self._offices[self._office]["name"]
             if title in {e.title for e in self._async_current_entries()}:
@@ -86,3 +88,45 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_AREA): _select(areas.items()),
                 vol.Required(CONF_STATION): _select(stations.items()),
             }))
+
+
+    async def async_step_amedas(self, user_input=None):
+        """4. アメダス実況値の取得方法"""
+        if user_input is not None:
+            self._mode = user_input[CONF_AMEDAS_MODE]
+            if self._mode == AMEDAS_STATION:
+                return await self.async_step_amedas_id()
+            return self._create()
+        return self.async_show_form(
+            step_id="amedas",
+            data_schema=vol.Schema({
+                vol.Required(CONF_AMEDAS_MODE, default=AMEDAS_HOME): _select([
+                    (AMEDAS_HOME, "自宅の最寄りの観測所（自動取得）"),
+                    (AMEDAS_STATION, "観測所IDを指定する"),
+                    (AMEDAS_NONE, "利用しない"),
+                ])}))
+
+    async def async_step_amedas_id(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            table = await self.hass.async_add_executor_job(get_table)
+            sid = user_input[CONF_AMEDAS_ID].strip()
+            if sid in table:
+                self._amedas_id = sid
+                return self._create()
+            errors[CONF_AMEDAS_ID] = "invalid_station"
+        return self.async_show_form(
+            step_id="amedas_id",
+            data_schema=vol.Schema({vol.Required(CONF_AMEDAS_ID): str}),
+            errors=errors)
+
+    def _create(self):
+        title = self._offices[self._office]["name"]
+        if title in {e.title for e in self._async_current_entries()}:
+            title = f"{title} {self._stations[self._point[CONF_STATION]]}"
+        return self.async_create_entry(
+            title=title,
+            data={CONF_CENTER: self._center, CONF_OFFICE: self._office,
+                  **self._point,
+                  CONF_AMEDAS_MODE: self._mode,
+                  CONF_AMEDAS_ID: self._amedas_id})

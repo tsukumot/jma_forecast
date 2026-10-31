@@ -67,7 +67,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     _attr_has_entity_name = True
-    _attr_name = "天気"
+    _attr_name = "予報"
     _attr_attribution = "出典: 気象庁"
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND

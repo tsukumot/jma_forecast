@@ -5,8 +5,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, CONF_OFFICE, CONF_AREA, CONF_STATION
+from .const import (
+    DOMAIN,
+    CONF_OFFICE, CONF_AREA, CONF_STATION,
+    CONF_AMEDAS_MODE, CONF_AMEDAS_ID, AMEDAS_NONE,
+)
 from .jma import fetch_latest, fetch_daily
+from .amedas import fetch_amedas
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,13 +21,26 @@ PLATFORMS = ["sensor", "weather"]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     c = entry.data
     office, area, station = c[CONF_OFFICE], c[CONF_AREA], c[CONF_STATION]
+    mode = c.get(CONF_AMEDAS_MODE, AMEDAS_NONE)
+    amedas_id = c.get(CONF_AMEDAS_ID)
+    last = {}
 
     async def update():
         hourly = await hass.async_add_executor_job(
             fetch_latest, office, area, station)
         daily = await hass.async_add_executor_job(
             fetch_daily, office, area, station)
-        return {"hourly": hourly, "daily": daily}
+        if mode != AMEDAS_NONE:
+            try:
+                data = await hass.async_add_executor_job(
+                    fetch_amedas, mode, amedas_id,
+                    hass.config.latitude, hass.config.longitude)
+                if data:
+                    last["amedas"] = data
+            except Exception:
+                _LOGGER.exception("jma amedas fetch failed")
+        return {"hourly": hourly, "daily": daily,
+                "amedas": last.get("amedas", {})}
 
     coord = DataUpdateCoordinator(
         hass, _LOGGER, name=f"jma_forecast_{office}_{area}_{station}",
