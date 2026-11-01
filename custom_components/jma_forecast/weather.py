@@ -159,19 +159,24 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
         return {day: (min(vals), max(vals)) for day, vals in temps.items()}
 
     async def async_forecast_daily(self):
+        now = dt_util.now()
         ranges = self._hourly_range()
         out = []
         for d in (self.coordinator.data or {}).get("daily") or []:
             code = d.get("weather_code") or ""
             tmax, tmin = d.get("temp_max"), d.get("temp_min")
-            # 週間予報に値がない日は、3時間予報の範囲で補う
             day = datetime.fromisoformat(d["datetime"]).date()
             if day in ranges:
                 low, high = ranges[day]
-                if tmax is None:
-                    tmax = high
-                if tmin is None:
-                    tmin = low
+                if day == now.date() and now.hour >= 9:
+                    # 今日の9時以降は、24時までの3時間予報から取る
+                    tmin, tmax = low, high
+                else:
+                    # それ以外は、気象庁JSONの値を優先し、空なら補う
+                    if tmax is None:
+                        tmax = high
+                    if tmin is None:
+                        tmin = low
             out.append({
                 "datetime": d["datetime"],
                 "condition": _CODE_COND.get(code[:1]),
