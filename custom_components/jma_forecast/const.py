@@ -23,4 +23,5 @@ DAILY_URL = "https://www.jma.go.jp/bosai/forecast/data/forecast/{office}.json"
 AMEDAS_TABLE_URL = "https://www.jma.go.jp/bosai/amedas/const/amedastable.json"
 AMEDAS_LATEST_URL = "https://www.jma.go.jp/bosai/amedas/data/latest_time.txt"
 AMEDAS_MAP_URL = "https://www.jma.go.jp/bosai/amedas/data/map/{ts}.json"
+OVERVIEW_URL = "https://www.jma.go.jp/bosai/forecast/data/overview_forecast/{office}.json"
 

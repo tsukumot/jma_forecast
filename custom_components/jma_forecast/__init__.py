@@ -5,17 +5,18 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .amedas import fetch_amedas
 from .const import (
     DOMAIN,
     CONF_OFFICE, CONF_AREA, CONF_STATION,
     CONF_AMEDAS_MODE, CONF_AMEDAS_ID, AMEDAS_NONE,
 )
 from .jma import fetch_latest, fetch_daily
-from .amedas import fetch_amedas
-
-_LOGGER = logging.getLogger(__name__)
+from .overview import fetch_overview
 
 PLATFORMS = ["sensor", "weather"]
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -39,8 +40,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                     last["amedas"] = data
             except Exception:
                 _LOGGER.exception("jma amedas fetch failed")
+
+        try:
+            ov = await hass.async_add_executor_job(fetch_overview, office)
+            if ov:
+                last["overview"] = ov
+        except Exception:
+            _LOGGER.exception("jma overview fetch failed")
         return {"hourly": hourly, "daily": daily,
-                "amedas": last.get("amedas", {})}
+                "amedas": last.get("amedas", {}),
+                "overview": last.get("overview", {})}
 
     coord = DataUpdateCoordinator(
         hass, _LOGGER, name=f"jma_forecast_{office}_{area}_{station}",

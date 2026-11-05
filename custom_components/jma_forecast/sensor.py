@@ -55,6 +55,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     entities = [
         JmaTemp(coord, station, entry),
         JmaWeather(coord, area, entry),
+        JmaOverview(coord, entry),
     ]
     if c.get(CONF_AMEDAS_MODE, AMEDAS_NONE) != AMEDAS_NONE:
         got = ((coord.data or {}).get("amedas") or {}).get("values", {})
@@ -127,3 +128,40 @@ class JmaAmedas(_Base):
         d = self._data
         return {k: d.get(k) for k in
                 ("station_name", "distance_km", "observed_at")}
+
+
+class JmaOverview(_Base):
+    _attr_name = "天気概況"
+    # 行数が日によって変わり、長文にもなるので履歴(recorder)には残さない
+    _unrecorded_attributes = frozenset({"details"})
+
+    def __init__(self, coord, entry):
+        super().__init__(coord, entry)
+        self._attr_unique_id = f"{entry.entry_id}_overview"
+
+    @property
+    def _data(self):
+        return (self.coordinator.data or {}).get("overview") or {}
+
+    @property
+    def _lines(self):
+        # 空行を除いて1行ずつのリストにする
+        text = self._data.get("text") or ""
+        return [s.strip() for s in text.splitlines() if s.strip()]
+
+    @property
+    def native_value(self):
+        lines = self._lines
+        # stateは255文字まで。1行目が長い場合に備えて切る
+        return lines[0][:255] if lines else None
+
+    @property
+    def extra_state_attributes(self):
+        d = self._data
+        return {
+            "details": self._lines[1:],   # 2行目以降のリスト
+            "headline": d.get("headline"),
+            "report_datetime": d.get("report_datetime"),
+            "publishing_office": d.get("publishing_office"),
+            "target_area": d.get("target_area"),
+        }
