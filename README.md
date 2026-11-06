@@ -1,147 +1,158 @@
+日本語READMEは[→こちら](README.ja.md)
+
 # JMA Forecast for Home Assistant
 
-気象庁が発表している天気予報を自動取得し、天気・気温・風の予報を Home Assistant に表示するカスタム統合です。
-3時間ごとの予報の取得には「府県天気予報（Ｒ１）電文」を使用しています。
+A custom integration that automatically retrieves weather forecasts published by the Japan Meteorological Agency (JMA) and makes weather conditions, temperature, and wind forecasts available in Home Assistant.
 
-- 3時間ごとの予報（天気・気温・風向・風速・降水確率）を取得します。
-- 1日予報（天気・最低気温・最高気温・降水確率）を取得します。
-- 記録用センサー2つ（気温予報・天気予報）と、天気エンティティ（`weather`）を作成します。
-- 天気概況（府県天気概況）を取得するセンサーを作成します。
-- 気象庁のアメダス観測値（実況値）を取得するセンサーを追加できます。（任意）
-- 1地点のエンティティは1つのデバイス「JMA 予報」に所属します。
-- 複数地点の予報を取得することが可能です。
-- YAMLの編集は不要です。
-- 電文更新時に内容が変わらないときは再解析せず、キャッシュを使います。
+For 3-hourly forecasts, this integration uses the JMA *Prefectural Weather Forecast (R1) bulletin*.
 
-データ出典：[![気象庁](banner_jma.gif)](https://www.jma.go.jp)
+- Retrieves 3-hourly forecasts: weather conditions, temperature, wind direction, wind speed, and probability of precipitation.
+- Retrieves daily forecasts: weather conditions, minimum and maximum temperatures, and probability of precipitation.
+- Creates two history sensors (forecast temperature and forecast weather) and a weather entity (`weather`).
+- Creates a sensor for the weather synopsis (Prefectural Weather Overview).
+- - *Note:* The weather synopsis is provided in Japanese only. It is not translated into English.
+- Optionally creates sensors for real-time AMeDAS observations published by JMA.
+- All entities for a location are grouped under a single device named "JMA Forecast".
+- Supports registering multiple forecast locations.
+- No YAML configuration is required.
+- Uses cached data instead of re-parsing bulletins when an updated bulletin contains no changes.
 
-## インストール
+Data source: [![JMA](banner_jma.gif)](https://www.jma.go.jp)
 
-### HACS（カスタムリポジトリ）
+## Installation
 
-1. HACS → 右上のメニュー → **カスタムリポジトリ**
-2. リポジトリに `https://github.com/tsukumot/jma_forecast` 、種類に **Integration** を指定して追加
-3. 「JMA Forecast」をダウンロードし、 Home Assistant を再起動
+### HACS (Custom Repository)
 
-## 設定
+1. Open HACS → menu in the upper-right corner → **Custom repositories**.
+2. Add `https://github.com/tsukumot/jma_forecast` and select **Integration** as the category.
+3. Download "JMA Forecast" and restart Home Assistant.
 
-1. **設定 → デバイスとサービス → 統合を追加** で「JMA Forecast」を選択
-2. **地方** を選ぶ（例：関東甲信地方）
-3. **府県予報区** を選ぶ（例：東京都）
-4. **一次細分区域（天気）** と **地点（気温）** を選ぶ
-5. **アメダス実況値の取得方法** を選ぶ
-   - 自宅の最寄りの観測所（自動取得）：Home Assistant に設定した自宅の緯度・経度から、気温が取得できる最寄りの観測所を選びます
-   - 観測所IDを指定する：観測所ID（例：`44132`＝東京）を入力します
-   - 利用しない：アメダスのセンサーを作成しません
+## Configuration
 
-複数の地点を登録することもできます。
-同じ府県予報区を2つ以上登録した場合、2つ目以降は地点名がタイトルに付きます。
+1. Go to **Settings → Devices & Services → Add Integration** and select "JMA Forecast".
+2. Select a **Region** (e.g. Kanto-Koshin).
+3. Select a **Prefectural Forecast Area** (e.g. Tokyo).
+4. Select a **Primary Subdivision (Weather)** and a **Location (Temperature)**.
+5. Select how to retrieve AMeDAS observations:
+   - **Nearest station to home (automatic):** Selects the nearest observation station that provides temperature data, based on the home latitude and longitude configured in Home Assistant.
+   - **Specify station ID:** Enter an observation station ID (e.g. `44132` = Tokyo).
+   - **Disabled:** No AMeDAS sensors will be created.
 
-> `configuration.yaml` への `platform: jma_forecast` の記述は不要です。
+Multiple forecast locations can be registered.
 
-### 「この府県予報区の予報電文がまだ配信されていません」と出たら
+If the same Prefectural Forecast Area is registered more than once, the location name is appended to the titles of the second and subsequent entries.
 
-無効な選択肢である可能性が高いです。
-ご一報いただければ対応します。
+> Adding `platform: jma_forecast` to `configuration.yaml` is not required.
 
-## 作成されるエンティティ
+### If you see "Forecast bulletin for this Prefectural Forecast Area has not been published yet"
 
-| エンティティ | 種類 | 内容 | 更新間隔 |
+This most likely indicates an invalid selection.
+
+Please let me know if this occurs so I can investigate and address the issue.
+
+## Created Entities
+
+| Entity | Type | Description | Update Interval |
 | --- | --- | --- | --- |
-| 天気概況 | `sensor` | 天気概況の本文1行目（2行目以降は属性に記載） | 10分 |
-| 予想気温 | `sensor`（温度） | 現在時刻に該当する枠の気温（℃） | 10分 |
-| 予報天気 | `sensor` | 現在時刻に該当する枠の天気（原文）（例：晴れ、くもり） | 10分 |
-| 予報 | `weather` | 天気・気温・降水確率・風向・風速、および1時間単位の予報（`forecast_hourly`） | 10分 |
+| Weather Overview | `sensor` | First line of the weather synopsis (provided in Japanese only; remaining lines are stored in attributes) | 10 minutes |
+| Forecast Temperature | `sensor` (temperature) | Temperature (°C) for the forecast time slot corresponding to the current time | 10 minutes |
+| Forecast Weather | `sensor` | Original JMA weather description for the forecast time slot corresponding to the current time (e.g. sunny, cloudy) | 10 minutes |
+| Forecast | `weather` | Weather conditions, temperature, probability of precipitation, wind direction, wind speed, and 3-hourly forecast data (`forecast_hourly`) | 10 minutes |
 
-天気エンティティでは、天気は気象庁の文言から Home Assistant の `condition` に次のように変換されます。
+For the weather entity, JMA weather descriptions are mapped to Home Assistant `condition` values as follows:
 
-| 文言に含まれる語 | condition |
+| Keywords in the original description | `condition` |
 | --- | --- |
-| 雪 と 雨 | `snowy-rainy` |
-| 雷 | `lightning` |
-| 雪 | `snowy` |
-| 雨 | `rainy` |
-| 霧 | `fog` |
-| くもり／曇 | `cloudy` |
-| 晴（日没後） | `clear-night` |
-| 晴（日中） | `sunny` |
+| Snow and rain | `snowy-rainy` |
+| Thunder | `lightning` |
+| Snow | `snowy` |
+| Rain | `rainy` |
+| Fog | `fog` |
+| Cloudy | `cloudy` |
+| Clear (after sunset) | `clear-night` |
+| Clear (during daytime) | `sunny` |
 
-上から順に判定するため、「雨で雷を伴う」のような文言では `lightning` になります。
+Conditions are evaluated in the order shown above. For example, a description meaning "rain with thunderstorms" is mapped to `lightning`.
 
-### 天気エンティティの属性
+### Weather Entity Attributes
 
-天気エンティティには、次の属性があります。
+The weather entity provides the following attributes:
 
-| 属性 | 内容 |
+| Attribute | Description |
 | --- | --- |
-| `weather_text` | 現在時刻に該当する枠の天気（気象庁の原文） |
-| `forecast_3h` | 3時間ごとの予報のリスト（現在の3時間前以降の枠） |
+| `weather_text` | Original JMA weather description for the forecast time slot corresponding to the current time |
+| `forecast_3h` | List of 3-hourly forecasts (including slots from 3 hours before the current time onward) |
 
-`forecast_3h` の各要素には、次の項目が入ります。
+Each entry in `forecast_3h` contains the following fields:
 
-| 項目 | 内容 |
+| Field | Description |
 | --- | --- |
-| `datetime` | 予報の対象時刻（ISO 8601） |
-| `weather` | 天気（原文。例：くもり、雨） |
-| `temperature` | 気温（℃） |
-| `precipitation_probability` | 降水確率（%） |
-| `wind_direction` | 風向（例：西、北西） |
-| `wind_speed_min` | 風速の下限（m/s） |
-| `wind_speed_max` | 風速の上限（m/s） |
-| `wind_speed_average` | 風速の平均値（m/s） |
+| `datetime` | Forecast time (ISO 8601) |
+| `weather` | Original weather description (e.g. cloudy, rain) |
+| `temperature` | Temperature (°C) |
+| `precipitation_probability` | Probability of precipitation (%) |
+| `wind_direction` | Wind direction (e.g. west, northwest) |
+| `wind_speed_min` | Minimum wind speed (m/s) |
+| `wind_speed_max` | Maximum wind speed (m/s) |
+| `wind_speed_average` | Average wind speed (m/s) |
 
-風速は電文の範囲をそのまま下限・上限に分けています。
-`forecast_3h` はデータ量が多いため、履歴（recorder）には保存されません。
+Wind speed ranges from the original bulletin are preserved as minimum and maximum values.
 
-### 天気概況センサーの属性
+Because `forecast_3h` contains a relatively large amount of data, it is excluded from the recorder history.
 
-天気概況の本文は長いため、センサーの値には1行目だけを入れ、2行目以降は属性（`details`）に1行ずつの配列で入ります。
+### Weather Overview Sensor Attributes
 
-| 属性 | 内容 |
+Since the weather synopsis can be quite long, only its first line is stored as the sensor state. The remaining lines are stored in the `details` attribute as an array of individual lines.
+
+| Attribute | Description |
 | --- | --- |
-| `details` | 本文の2行目以降（1行を1要素とした配列。空行は除きます） |
-| `headline` | 見出し（ない場合は空） |
-| `report_datetime` | 発表時刻（ISO 8601） |
-| `publishing_office` | 発表官署 |
-| `target_area` | 対象地域 |
+| `details` | Lines following the first line of the synopsis (an array with one element per line; empty lines are omitted) |
+| `headline` | Headline (empty if unavailable) |
+| `report_datetime` | Publication time (ISO 8601) |
+| `publishing_office` | Publishing JMA office |
+| `target_area` | Target area |
 
-`details` はデータ量が多いため、履歴（recorder）には保存されません。
+Because `details` contains a relatively large amount of data, it is excluded from the recorder history.
 
-### アメダス実況値センサー
+### AMeDAS Observation Sensors
 
-実況値の取得方法で「利用しない」以外を選ぶと、観測所が公表している項目ごとにセンサーが作成されます（10分ごとに更新）。
+When any option other than "Disabled" is selected for AMeDAS observations, sensors are created for each parameter reported by the selected observation station. These sensors are updated every 10 minutes.
 
-| センサー | 単位 |
+| Sensor | Unit |
 | --- | --- |
-| 気温 | ℃ |
-| 湿度 | % |
-| 現地気圧・海面気圧 | hPa |
-| 降水量（10分・1時間・3時間・24時間） | mm |
-| 日照時間（10分・1時間） | 分・時間 |
-| 風速 | m/s |
-| 風向 | 度（静穏の場合は値なし） |
-| 積雪 | cm |
-| 降雪量（1時間・6時間・12時間・24時間） | cm |
+| Temperature | °C |
+| Humidity | % |
+| Station pressure / Sea-level pressure | hPa |
+| Precipitation (10-minute, 1-hour, 3-hour, and 24-hour) | mm |
+| Sunshine duration (10-minute and 1-hour) | minutes / hours |
+| Wind speed | m/s |
+| Wind direction | degrees (no value when calm) |
+| Snow depth | cm |
+| Snowfall (1-hour, 6-hour, 12-hour, and 24-hour) | cm |
 
-各センサーには、属性として観測所名（`station_name`）、自宅からの距離（`distance_km`）、観測時刻（`observed_at`）が付きます。
+Each sensor also provides the following attributes:
 
-## 制限・注意
+- `station_name`: Observation station name
+- `distance_km`: Distance from home
+- `observed_at`: Observation timestamp
 
-- 短期予報は3時間ごとです。 `forecast_hourly` には、現在の3時間前以降の枠がそのまま入ります（1時間ごとに補間はしません）。
-- 降水確率は6時間ごとの予報値です。そのため、3時間予報には同じ値を2回表示しています。
-- 週間予報は（最大）3日目までは指定した地域の予報、それ以降では都道府県ごとの予報になります。
-- 当日分の予想最低気温・最高気温は、時間帯により表示する値を変えています。
-  - 予想最低気温は、朝9時以降になると当日の3時間予報から最低値を取得しています。これは主に夕方以降の気温低下を反映させるための処理です。
-  - 予想最高気温は、夕方以降になると値が提供されないため、当日の3時間予報から最高値を取得します。
-- 風速は、電文の風速レベルの範囲（下限・上限）の平均値を m/s として扱います。上限・下限は属性に記載しています。
-- 日没後かどうかの判定は、天気エンティティの現在値では `sun.sun` 、 `forecast_hourly` では 18時〜6時 の簡易判定です。
-- 地方・府県予報区の一覧は同梱の `area.json` から読み込みます。気象庁側の区域改定があった場合、このファイルの差し替えが必要です。
-- アメダスのセンサーは、登録時に観測所が公表している項目のみ作成されます。（例：雪の項目は積雪地域のみ）後から項目が増えた場合、再読込するまで取得・反映されません。
-- アメダスの取得に失敗したときは、直前に取得できた値を表示し続けます。
-- 「自宅の最寄り」は、気温が取得可能な観測所の中から直線距離で選びます。
-- 電文や各データの発表間隔や内容は気象庁の運用に依存します。
+## Limitations and Notes
 
-## ライセンス・出典
+- Short-range forecasts are provided at 3-hour intervals. `forecast_hourly` contains the original 3-hourly forecast slots from 3 hours before the current time onward. No hourly interpolation is performed.
+- Probability of precipitation is forecast at 6-hour intervals. Therefore, the same value is displayed twice in the 3-hourly forecast.
+- Weekly forecasts use the selected forecast area for up to day 3 (maximum). From day 4 onward, forecasts are provided at the prefecture level.
+- The predicted minimum and maximum temperatures for the current day are determined differently depending on the time of day:
+  - **Minimum temperature:** From 9:00 AM onward, the minimum is calculated from the current day's 3-hourly forecast. This is primarily intended to reflect temperature drops expected in the evening and later.
+  - **Maximum temperature:** Since this value is no longer provided in the forecast during the evening and later, it is calculated from the current day's 3-hourly forecast.
+- Wind speed is represented by the average of the minimum and maximum values of the wind speed range specified in the bulletin, in m/s. The original minimum and maximum values are available as attributes.
+- Sunset detection uses `sun.sun` for the current state of the weather entity. For `forecast_hourly`, a simplified time-based rule is used: 6:00 PM to 6:00 AM.
+- The list of regions and Prefectural Forecast Areas is loaded from the bundled `area.json` file. If JMA revises its forecast area definitions, this file must be updated accordingly.
+- AMeDAS sensors are created only for parameters reported by the selected station at the time of registration (e.g. snow-related sensors are available only at stations in snowy regions). If additional parameters become available later, they will not be retrieved or reflected until the integration is reloaded.
+- If retrieving AMeDAS observations fails, the most recently retrieved values continue to be displayed.
+- The nearest station to home is selected based on straight-line distance among stations that provide temperature observations.
+- The publication intervals and contents of bulletins and other data depend on JMA's operational schedule.
 
-- 各予報およびアメダスのデータは気象庁が提供するものです。利用にあたっては[気象庁ホームページの利用規約](https://www.jma.go.jp/jma/kishou/info/coment.html)に従ってください。
-- 本統合は気象庁とは無関係な、非公式のものです。
+## License and Data Sources
+
+- Forecasts and AMeDAS observation data are provided by the Japan Meteorological Agency (JMA). Use of these data is subject to the [JMA Website Terms of Use](https://www.jma.go.jp/jma/kishou/info/coment.html).
+- This integration is an unofficial project and is not affiliated with or endorsed by JMA.
