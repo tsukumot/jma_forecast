@@ -47,8 +47,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
                 last["overview"] = ov
         except Exception:
             _LOGGER.exception("jma overview fetch failed")
-        return {"hourly": hourly, "daily": daily,
+        return {"hourly": hourly, "daily": daily["days"],
                 "amedas": last.get("amedas", {}),
+                "pops": daily["pops"],
                 "overview": last.get("overview", {})}
 
     coord = DataUpdateCoordinator(

@@ -183,6 +183,16 @@ def _short_days(j, area, station):
     return days
 
 
+def _pop_slots(j, area):
+    """6時間ごとの降水確率を {開始時刻(datetime): 確率} にする。"""
+    series = j[0]["timeSeries"][1]
+    p = _pick(series["areas"], area, fallback=False)
+    if not p:
+        return {}
+    return {datetime.fromisoformat(d): float(v)
+            for d, v in zip(series["timeDefines"], p["pops"])
+            if v != ""}
+
 def _parse_daily(j, office, area, station):
     days = _weekly_days(j, office, station)
     # 3日分の予報で見つかった項目は、週間予報の値を上書きする
@@ -205,7 +215,7 @@ def fetch_daily(office, area, station):
             j = json.load(r)
         days = _parse_daily(j, office, area, station)
         if days:
-            _daily_cache[key] = days
+            _daily_cache[key] = {"days": days, "pops": _pop_slots(j, area)}
     except Exception as err:  # 失敗しても3時間予報は止めない
         _LOGGER.warning("jma daily fetch failed: %s", err)
-    return _daily_cache.get(key, [])
+    return _daily_cache.get(key, {"days": [], "pops": {}})

@@ -12,12 +12,11 @@ from .const import (
     DOMAIN,
     CONF_AREA,
 )
-
 _LOGGER = logging.getLogger(__name__)
+
 
 _BEARING = {"北": 0, "北東": 45, "東": 90, "南東": 135,
             "南": 180, "南西": 225, "西": 270, "北西": 315}
-
 # 天気コードの先頭1桁 → condition
 _CODE_COND = {"1": "sunny", "2": "cloudy", "3": "rainy", "4": "snowy"}
 
@@ -49,6 +48,7 @@ def _speed(rng):
         return None
     return sum(nums) / len(nums) if nums else None
 
+
 def _speed_range(rng):
     """"3 5" -> (3.0, 5.0)。数値が1つなら下限=上限。取れなければ (None, None)"""
     try:
@@ -58,6 +58,13 @@ def _speed_range(rng):
     if not nums:
         return None, None
     return min(nums), max(nums)
+
+
+def _pop_at(pops, dt):
+    """3時間枠の時刻dtを含む6時間区間の降水確率。なければNone"""
+    start = dt.replace(hour=dt.hour // 6 * 6, minute=0, second=0, microsecond=0)
+    return pops.get(start)
+
 
 async def async_setup_entry(hass, entry, async_add_entities):
     coord = hass.data[DOMAIN][entry.entry_id]
@@ -88,6 +95,10 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     def _hourly(self):
         return (self.coordinator.data or {}).get("hourly") or {}
 
+    @property
+    def _pops(self):
+        return (self.coordinator.data or {}).get("pops") or {}
+
     def _cur(self, key):
         return current_value(self._hourly, key, dt_util.now())
 
@@ -113,7 +124,8 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
         now = dt_util.now()
         slots = []
         for t, v in self._hourly.items():
-            if datetime.fromisoformat(t) < now - timedelta(hours=3):
+            dt = datetime.fromisoformat(t)
+            if dt < now - timedelta(hours=3):
                 continue
             lo, hi = _speed_range(v.get("wind_speed_ms"))
             av = _speed(v.get("wind_speed_ms"))
@@ -121,6 +133,7 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
                 "datetime": t,
                 "weather": v.get("weather"),
                 "temperature": v.get("temp"),
+                "precipitation_probability": _pop_at(self._pops, dt),
                 "wind_direction": v.get("wind_dir"),
                 "wind_speed_min": lo,
                 "wind_speed_max": hi,
@@ -144,6 +157,7 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
                 "condition": _condition(v.get("weather"), night),
                 "native_temperature": v.get("temp"),
                 "native_wind_speed": _speed(v.get("wind_speed_ms")),
+                "precipitation_probability": _pop_at(self._pops, dt),
                 "wind_bearing": _BEARING.get(v.get("wind_dir")),
             })
         return out
