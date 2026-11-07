@@ -90,10 +90,23 @@ def current_value(data, key, now):
             value = v[key]
     return value
 
+def is_ja(hass):
+    """HAの言語設定が日本語か"""
+    return hass.config.language.split("-")[0].lower() == "ja"
+
+
+def local_name(hass, item, fallback=""):
+    """日本語なら name、それ以外は enName を返す。無ければ日本語名 → fallback"""
+    item = item or {}
+    if is_ja(hass):
+        return item.get("name") or fallback
+    return item.get("enName") or item.get("name") or fallback
+
+
 def fetch_offices():
     with open(_AREA_FILE, encoding="utf-8") as r:
         j = json.load(r)
-    return j["centers"], j["offices"]
+    return j["centers"], j["offices"], j["class10s"]
 
 
 def list_choices(office):

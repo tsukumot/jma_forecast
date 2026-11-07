@@ -10,12 +10,25 @@ from .const import (
     CONF_AMEDAS_MODE, CONF_AMEDAS_ID,
     AMEDAS_HOME, AMEDAS_STATION, AMEDAS_NONE,
 )
-from .jma import fetch_offices, list_choices
+from .jma import fetch_offices, list_choices, local_name
 from .amedas import get_table
 
-def _select(options):
+def _select(options, translation_key=None):
+    """translation_key があれば、画面を開いた人の言語の翻訳を優先して表示する。
+    翻訳が無い選択肢は label (HA全体の言語に合わせた名前) で表示される。"""
+    config = SelectSelectorConfig(
+        options=[SelectOptionDict(value=v, label=l) for v, l in options])
+    if translation_key:  # None を渡すと設定の検証でエラーになるので、あるときだけ入れる
+        config["translation_key"] = translation_key
+    return SelectSelector(config)
+
+
+def _amedas_select():
+    # 選択肢の表示名は translations の selector.amedas_mode で定義する
+    # (画面を開いたユーザーの言語で表示される)
     return SelectSelector(SelectSelectorConfig(
-        options=[SelectOptionDict(value=v, label=l) for v, l in options]))
+        options=[AMEDAS_HOME, AMEDAS_STATION, AMEDAS_NONE],
+        translation_key="amedas_mode"))
 
 
 class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -24,6 +37,7 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self):
         self._centers = None
         self._offices = None
+        self._class10s = None
         self._center = None
         self._office = None
         self._stations = {}
@@ -33,7 +47,8 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _load(self):
         if self._centers is None:
-            self._centers, self._offices = await self.hass.async_add_executor_job(
+            (self._centers, self._offices,
+             self._class10s) = await self.hass.async_add_executor_job(
                 fetch_offices)
 
     async def async_step_user(self, user_input=None):
@@ -43,10 +58,11 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._center = user_input[CONF_CENTER]
             return await self.async_step_office()
 
-        options = [(code, c["name"]) for code, c in self._centers.items()]
+        options = [(code, local_name(self.hass, c))
+                   for code, c in self._centers.items()]
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema({vol.Required(CONF_CENTER): _select(options)}))
+            data_schema=vol.Schema({vol.Required(CONF_CENTER): _select(options, "jma_center")}))
 
     async def async_step_office(self, user_input=None):
         """2. その地方の府県予報区を選ぶ"""
@@ -54,14 +70,15 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._office = user_input[CONF_OFFICE]
             return await self.async_step_point()
 
-        options = [(code, self._offices[code]["name"])
+        options = [(code, local_name(self.hass, self._offices[code]))
                    for code in self._centers[self._center]["children"]
                    if code in self._offices]
         return self.async_show_form(
             step_id="office",
-            data_schema=vol.Schema({vol.Required(CONF_OFFICE): _select(options)}))
+            data_schema=vol.Schema({vol.Required(CONF_OFFICE): _select(options, "jma_office")}))
 
     async def async_step_point(self, user_input=None):
+        """3. 一次細分区域（天気）と地点（気温）を選ぶ"""
         if user_input is not None:
             uid = f"{self._office}_{user_input[CONF_AREA]}_{user_input[CONF_STATION]}"
             await self.async_set_unique_id(uid)
@@ -69,26 +86,20 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._point = user_input
             return await self.async_step_amedas()
 
-            title = self._offices[self._office]["name"]
-            if title in {e.title for e in self._async_current_entries()}:
-                title = f"{title} {self._stations[user_input[CONF_STATION]]}"
-            return self.async_create_entry(
-                title=title,
-                data={CONF_CENTER: self._center, CONF_OFFICE: self._office,
-                      **user_input})
-
         res = await self.hass.async_add_executor_job(list_choices, self._office)
         if not res or not res[0] or not res[1]:
             return self.async_abort(reason="no_data")
         areas, stations = res
+        # 区域名: area.json の class10s に enName があればそれを使う
+        areas = {code: local_name(self.hass, self._class10s.get(code), name)
+                 for code, name in areas.items()}
         self._stations = stations
         return self.async_show_form(
             step_id="point",
             data_schema=vol.Schema({
-                vol.Required(CONF_AREA): _select(areas.items()),
-                vol.Required(CONF_STATION): _select(stations.items()),
+                vol.Required(CONF_AREA): _select(areas.items(), "jma_area"),
+                vol.Required(CONF_STATION): _select(stations.items(), "jma_station"),
             }))
-
 
     async def async_step_amedas(self, user_input=None):
         """4. アメダス実況値の取得方法"""
@@ -100,11 +111,8 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="amedas",
             data_schema=vol.Schema({
-                vol.Required(CONF_AMEDAS_MODE, default=AMEDAS_HOME): _select([
-                    (AMEDAS_HOME, "自宅の最寄りの観測所（自動取得）"),
-                    (AMEDAS_STATION, "観測所IDを指定する"),
-                    (AMEDAS_NONE, "利用しない"),
-                ])}))
+                vol.Required(CONF_AMEDAS_MODE, default=AMEDAS_HOME):
+                    _amedas_select()}))
 
     async def async_step_amedas_id(self, user_input=None):
         errors = {}
@@ -121,7 +129,7 @@ class JmaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors)
 
     def _create(self):
-        title = self._offices[self._office]["name"]
+        title = local_name(self.hass, self._offices[self._office])
         if title in {e.title for e in self._async_current_entries()}:
             title = f"{title} {self._stations[self._point[CONF_STATION]]}"
         return self.async_create_entry(

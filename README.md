@@ -57,7 +57,7 @@ Please let me know if this occurs so I can investigate and address the issue.
 | Weather Overview | `sensor` | First line of the weather synopsis (provided in Japanese only; remaining lines are stored in attributes) | 10 minutes |
 | Forecast Temperature | `sensor` (temperature) | Temperature (°C) for the forecast time slot corresponding to the current time | 10 minutes |
 | Forecast Weather | `sensor` | Original JMA weather description for the forecast time slot corresponding to the current time (e.g. sunny, cloudy) | 10 minutes |
-| Forecast | `weather` | Weather conditions, temperature, probability of precipitation, wind direction, wind speed, and 3-hourly forecast data (`forecast_hourly`) | 10 minutes |
+| Forecast | `weather` | Weather conditions, temperature, probability of precipitation, wind direction, wind speed, daily forecast, and 3-hourly forecast data (`forecast_hourly`) | 10 minutes |
 
 For the weather entity, JMA weather descriptions are mapped to Home Assistant `condition` values as follows:
 

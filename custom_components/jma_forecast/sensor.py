@@ -14,7 +14,7 @@ from .const import (
     CONF_AMEDAS_MODE,
     AMEDAS_NONE,
 )
-from .jma import current_value
+from .jma import current_value, is_ja
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,25 +26,25 @@ CM = UnitOfLength.CENTIMETERS
 C = UnitOfTemperature.CELSIUS
 HPA = UnitOfPressure.HPA
 SDC = SensorDeviceClass
-# 気象庁JSONのキー: (名前, 単位, device_class)
+# 気象庁JSONのキー: (単位, device_class)  ※名前は translations の entity で定義
 AMEDAS_SENSORS = {
-    "temp": ("気温", C, SDC.TEMPERATURE),
-    "humidity": ("湿度", PERCENTAGE, SDC.HUMIDITY),
-    "pressure": ("現地気圧", HPA, SDC.ATMOSPHERIC_PRESSURE),
-    "normalPressure": ("海面気圧", HPA, SDC.ATMOSPHERIC_PRESSURE),
-    "precipitation10m": ("降水量(10分)", MM, SDC.PRECIPITATION),
-    "precipitation1h": ("降水量(1時間)", MM, SDC.PRECIPITATION),
-    "precipitation3h": ("降水量(3時間)", MM, SDC.PRECIPITATION),
-    "precipitation24h": ("降水量(24時間)", MM, SDC.PRECIPITATION),
-    "sun10m": ("日照時間(10分)", UnitOfTime.MINUTES, SDC.DURATION),
-    "sun1h": ("日照時間(1時間)", UnitOfTime.HOURS, SDC.DURATION),
-    "wind": ("風速", MS, SDC.WIND_SPEED),
-    "windDirection": ("風向", DEGREE, None),
-    "snow": ("積雪", CM, None),
-    "snow1h": ("降雪量(1時間)", CM, None),
-    "snow6h": ("降雪量(6時間)", CM, None),
-    "snow12h": ("降雪量(12時間)", CM, None),
-    "snow24h": ("降雪量(24時間)", CM, None),
+    "temp": (C, SDC.TEMPERATURE),
+    "humidity": (PERCENTAGE, SDC.HUMIDITY),
+    "pressure": (HPA, SDC.ATMOSPHERIC_PRESSURE),
+    "normalPressure": (HPA, SDC.ATMOSPHERIC_PRESSURE),
+    "precipitation10m": (MM, SDC.PRECIPITATION),
+    "precipitation1h": (MM, SDC.PRECIPITATION),
+    "precipitation3h": (MM, SDC.PRECIPITATION),
+    "precipitation24h": (MM, SDC.PRECIPITATION),
+    "sun10m": (UnitOfTime.MINUTES, SDC.DURATION),
+    "sun1h": (UnitOfTime.HOURS, SDC.DURATION),
+    "wind": (MS, SDC.WIND_SPEED),
+    "windDirection": (DEGREE, None),
+    "snow": (CM, None),
+    "snow1h": (CM, None),
+    "snow6h": (CM, None),
+    "snow12h": (CM, None),
+    "snow24h": (CM, None),
 }
 
 
@@ -71,7 +71,7 @@ class _Base(CoordinatorEntity, SensorEntity):
         super().__init__(coord)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
-            name="JMA 予報",
+            name="JMA 予報" if is_ja(coord.hass) else "JMA Forecast",
             manufacturer="気象庁",
             entry_type=DeviceEntryType.SERVICE,
         )
@@ -81,7 +81,7 @@ class _Base(CoordinatorEntity, SensorEntity):
         return current_value(hourly, key, dt_util.now())
 
 class JmaTemp(_Base):
-    _attr_name = "予想気温"
+    _attr_translation_key = "forecast_temp"
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_device_class = SensorDeviceClass.TEMPERATURE
 
@@ -95,7 +95,7 @@ class JmaTemp(_Base):
 
 
 class JmaWeather(_Base):
-    _attr_name = "予報天気"
+    _attr_translation_key = "forecast_weather"
 
     def __init__(self, coord, area, entry):
         super().__init__(coord, entry)
@@ -107,10 +107,10 @@ class JmaWeather(_Base):
 
 
 class JmaAmedas(_Base):
-    def __init__(self, coord, entry, key, name, unit, dclass):
+    def __init__(self, coord, entry, key, unit, dclass):
         super().__init__(coord, entry)
         self._key = key
-        self._attr_name = name
+        self._attr_translation_key = f"amedas_{key}"
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = dclass
         self._attr_unique_id = f"{entry.entry_id}_amedas_{key}"
@@ -131,7 +131,7 @@ class JmaAmedas(_Base):
 
 
 class JmaOverview(_Base):
-    _attr_name = "天気概況"
+    _attr_translation_key = "overview"
     # 行数が日によって変わり、長文にもなるので履歴(recorder)には残さない
     _unrecorded_attributes = frozenset({"details"})
 

@@ -74,7 +74,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
 class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
     _attr_has_entity_name = True
-    _attr_name = "予報"
+    _attr_translation_key = "forecast"
     _attr_attribution = "出典: 気象庁"
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND
@@ -139,8 +139,11 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
                 "wind_speed_max": hi,
                 "wind_speed_average": av,
             })
+        tmax, tmin = self._today_temps()
         return {
             "weather_text": self._cur("weather"),
+            "temperature_max": tmax,
+            "temperature_min": tmin,
             "forecast_3h": slots,
         }
 
@@ -172,25 +175,39 @@ class JmaWeatherEntity(CoordinatorEntity, WeatherEntity):
             temps.setdefault(day, []).append(v["temp"])
         return {day: (min(vals), max(vals)) for day, vals in temps.items()}
 
+    def _temps_for(self, d, ranges, now):
+        """1日分のデータ d から (最高, 最低) 気温を返す。"""
+        tmax, tmin = d.get("temp_max"), d.get("temp_min")
+        day = datetime.fromisoformat(d["datetime"]).date()
+        if day in ranges:
+            low, high = ranges[day]
+            if day == now.date() and now.hour >= 9:
+                # 今日の9時以降は、24時までの3時間予報から取る
+                tmin, tmax = low, high
+            else:
+                # それ以外は、気象庁JSONの値を優先し、空なら補う
+                if tmax is None:
+                    tmax = high
+                if tmin is None:
+                    tmin = low
+        return tmax, tmin
+
+    def _today_temps(self):
+        """今日の (最高, 最低) 気温。日別予報に表示している値と同じ。"""
+        now = dt_util.now()
+        ranges = self._hourly_range()
+        for d in (self.coordinator.data or {}).get("daily") or []:
+            if datetime.fromisoformat(d["datetime"]).date() == now.date():
+                return self._temps_for(d, ranges, now)
+        return None, None
+
     async def async_forecast_daily(self):
         now = dt_util.now()
         ranges = self._hourly_range()
         out = []
         for d in (self.coordinator.data or {}).get("daily") or []:
             code = d.get("weather_code") or ""
-            tmax, tmin = d.get("temp_max"), d.get("temp_min")
-            day = datetime.fromisoformat(d["datetime"]).date()
-            if day in ranges:
-                low, high = ranges[day]
-                if day == now.date() and now.hour >= 9:
-                    # 今日の9時以降は、24時までの3時間予報から取る
-                    tmin, tmax = low, high
-                else:
-                    # それ以外は、気象庁JSONの値を優先し、空なら補う
-                    if tmax is None:
-                        tmax = high
-                    if tmin is None:
-                        tmin = low
+            tmax, tmin = self._temps_for(d, ranges, now)
             out.append({
                 "datetime": d["datetime"],
                 "condition": _CODE_COND.get(code[:1]),
