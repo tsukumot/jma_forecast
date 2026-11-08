@@ -1,0 +1,47 @@
+name: Update area.json and translations
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"   # 毎週月曜 0:00 (UTC) = 日本時間 9:00
+  workflow_dispatch:       # Actions タブから手動でも実行できる
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Update data
+        run: python tools/update_translations.py
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: auto/update-translations
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "変更なし"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "$BRANCH"
+          git add -A
+          git commit -m "Update area.json and translations"
+          git push --force origin "$BRANCH"
+          # すでにプルリクエストがあれば、上の push で中身が更新される
+          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" = "0" ]; then
+            gh pr create \
+              --base "${{ github.event.repository.default_branch }}" \
+              --head "$BRANCH" \
+              --title "Update area.json and translations" \
+              --body "気象庁の最新データから area.json と翻訳を更新しました。差分を確認してからマージしてください。"
+          fi
