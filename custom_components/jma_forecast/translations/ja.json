@@ -62,7 +62,7 @@
       "amedas_pressure": {
         "name": "現地気圧"
       },
-      "amedas_normalPressure": {
+      "amedas_normalpressure": {
         "name": "海面気圧"
       },
       "amedas_precipitation10m": {
@@ -86,7 +86,7 @@
       "amedas_wind": {
         "name": "風速"
       },
-      "amedas_windDirection": {
+      "amedas_winddirection": {
         "name": "風向"
       },
       "amedas_snow": {
