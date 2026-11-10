@@ -62,7 +62,7 @@
       "amedas_pressure": {
         "name": "Station pressure"
       },
-      "amedas_normalPressure": {
+      "amedas_normalpressure": {
         "name": "Sea-level pressure"
       },
       "amedas_precipitation10m": {
@@ -86,7 +86,7 @@
       "amedas_wind": {
         "name": "Wind speed"
       },
-      "amedas_windDirection": {
+      "amedas_winddirection": {
         "name": "Wind direction"
       },
       "amedas_snow": {

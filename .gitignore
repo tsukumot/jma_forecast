@@ -2,7 +2,7 @@
 *.tar.gz
 *.bak
 area.json
-custom_components/jma_forecast/translations/*
+translations/*
 build/*
 dist/*
 .DS_Store
