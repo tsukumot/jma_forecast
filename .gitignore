@@ -2,7 +2,7 @@
 *.tar.gz
 *.bak
 area.json
-translations/*
+translations/
 build/*
 dist/*
 .DS_Store
