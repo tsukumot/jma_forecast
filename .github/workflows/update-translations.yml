@@ -1,13 +1,11 @@
 name: Update area.json and translations
 
 on:
-  schedule:
-    - cron: "0 0 * * 1"   # 毎週月曜 0:00 (UTC) = 日本時間 9:00
-  workflow_dispatch:       # Actions タブから手動でも実行できる
+  # 定期実行は GitHub の cron ではなく、Home Assistant から API で起動する
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   update:
@@ -20,12 +18,13 @@ jobs:
           python-version: "3.12"
 
       - name: Update data
+        env:
+          SUMMARY_FILE: ${{ runner.temp }}/summary.md
         run: python tools/update_translations.py
 
-      - name: Create pull request
+      - name: Commit changes
         env:
-          GH_TOKEN: ${{ github.token }}
-          BRANCH: auto/update-translations
+          SUMMARY_FILE: ${{ runner.temp }}/summary.md
         run: |
           if [ -z "$(git status --porcelain)" ]; then
             echo "変更なし"
@@ -33,15 +32,11 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -C "$BRANCH"
           git add -A
-          git commit -m "Update area.json and translations"
-          git push --force origin "$BRANCH"
-          # すでにプルリクエストがあれば、上の push で中身が更新される
-          if [ "$(gh pr list --head "$BRANCH" --state open --json number --jq length)" = "0" ]; then
-            gh pr create \
-              --base "${{ github.event.repository.default_branch }}" \
-              --head "$BRANCH" \
-              --title "Update area.json and translations" \
-              --body "気象庁の最新データから area.json と翻訳を更新しました。差分を確認してからマージしてください。"
-          fi
+          {
+            echo "Update area.json and translations"
+            echo
+            if [ -f "$SUMMARY_FILE" ]; then cat "$SUMMARY_FILE"; fi
+          } > "$RUNNER_TEMP/message.txt"
+          git commit -F "$RUNNER_TEMP/message.txt"
+          git push

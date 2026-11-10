@@ -9,6 +9,7 @@
 area.json は translations フォルダの1つ上に書き出す。変更点は git diff で確認できる。
 """
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -41,6 +42,45 @@ def clean_area(area):
         removed += [(code, c) for c in center["children"] if c not in keep]
         center["children"] = keep
     return removed
+
+
+SECTION_LABELS = {"centers": "地方", "offices": "府県予報区", "class10s": "一次細分区域"}
+
+
+def _label(item):
+    return f'{item.get("name")} / {item.get("enName", "")}'
+
+
+def summarize(old, new):
+    """古い area.json と新しい area.json を比べて、変更点を Markdown の行にして返す。
+    変更がなければ空のリスト。"""
+    lines = []
+    for section, label in SECTION_LABELS.items():
+        o, n = old.get(section, {}), new.get(section, {})
+        for code in sorted(n.keys() - o.keys()):
+            lines.append(f"- {label}を追加: `{code}` {_label(n[code])}")
+        for code in sorted(o.keys() - n.keys()):
+            lines.append(f"- {label}を削除: `{code}` {_label(o[code])}")
+        for code in sorted(o.keys() & n.keys()):
+            if (o[code].get("name"), o[code].get("enName")) != (
+                    n[code].get("name"), n[code].get("enName")):
+                lines.append(
+                    f"- {label}の名前が変更: `{code}` {_label(o[code])} → {_label(n[code])}")
+    for code in sorted(old.get("centers", {}).keys() & new.get("centers", {}).keys()):
+        a, b = old["centers"][code]["children"], new["centers"][code]["children"]
+        if a != b:
+            lines.append(f"- 地方 `{code}` に含まれる府県予報区が変更: {a} → {b}")
+    return lines
+
+
+def dump_area(area):
+    """area.json を、1エントリ1行で書く(git の差分が読みやすくなる)。"""
+    sections = []
+    for section, items in area.items():
+        rows = [f"  {json.dumps(code)}:{json.dumps(v, ensure_ascii=False, separators=(',', ':'))}"
+                for code, v in items.items()]
+        sections.append(f" {json.dumps(section)}:{{\n" + ",\n".join(rows) + "\n }")
+    return "{\n" + ",\n".join(sections) + "\n}\n"
 
 
 def build_area(area):
@@ -95,16 +135,26 @@ def main(arg=None):
     for section in AREA_KEYS:
         if not area.get(section):
             sys.exit(f"area.json に {section} がありません。形式が変わった可能性があります。")
+    area_path = directory.parent / "area.json"
+    old_area = (json.loads(area_path.read_text(encoding="utf-8"))
+                if area_path.exists() else {})
     removed = clean_area(area)
     for center, code in removed:
         print(f"取り除いた: {center} の children {code}")
     names_area = build_area(area)
     names_station = build_stations(_get(TABLE_URL))
 
-    area_path = directory.parent / "area.json"
-    area_path.write_text(
-        json.dumps(area, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    area_path.write_text(dump_area(area), encoding="utf-8")
     print(f"area.json を更新: {area_path}")
+
+    changes = summarize(old_area, area)
+    print("変更点:" if changes else "area.json の変更点: なし")
+    for line in changes:
+        print(line)
+    summary_file = os.environ.get("SUMMARY_FILE")  # GitHub Actions がコミットメッセージに使う
+    if summary_file:
+        body = "\n".join(changes) if changes else "area.json の区分・名前の変更はありません。"
+        Path(summary_file).write_text(body + "\n", encoding="utf-8")
 
     for lang in ("ja", "en"):
         selectors = {**names_area[lang], **names_station[lang]}
