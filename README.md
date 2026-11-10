@@ -22,10 +22,14 @@ Data source: [![JMA](banner_jma.gif)](https://www.jma.go.jp)
 ## Installation
 
 ### HACS (Custom Repository)
+[
+![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)
+](https://my.home-assistant.io/redirect/hacs_repository/?owner=tsukumot&repository=jma_forecast&category=integration)
 
 1. Open HACS → menu in the upper-right corner → **Custom repositories**.
 2. Add `https://github.com/tsukumot/jma_forecast` and select **Integration** as the category.
 3. Download "JMA Forecast" and restart Home Assistant.
+
 
 ## Configuration
 

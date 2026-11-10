@@ -18,10 +18,14 @@
 ## インストール
 
 ### HACS（カスタムリポジトリ）
+[
+![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)
+](https://my.home-assistant.io/redirect/hacs_repository/?owner=tsukumot&repository=jma_forecast&category=integration)
 
 1. HACS → 右上のメニュー → **カスタムリポジトリ**
 2. リポジトリに `https://github.com/tsukumot/jma_forecast` 、種類に **Integration** を指定して追加
 3. 「JMA Forecast」をダウンロードし、 Home Assistant を再起動
+
 
 ## 設定
 
