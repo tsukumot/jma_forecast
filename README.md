@@ -90,6 +90,8 @@ Each entry in `forecast_3h` contains the following fields:
 | `datetime` | Forecast time (ISO 8601) |
 | `weather` | Original weather description (e.g. cloudy, rain) |
 | `temperature` | Temperature (°C) |
+| `temperature_min` | Minimum temperature (°C) |
+| `temperature_max` | Maximum temperature (°C) |
 | `precipitation_probability` | Probability of precipitation (%) |
 | `wind_direction` | Wind direction (e.g. west, northwest) |
 | `wind_speed_min` | Minimum wind speed (m/s) |
@@ -146,7 +148,6 @@ Each sensor also provides the following attributes:
   - **Maximum temperature:** Since this value is no longer provided in the forecast during the evening and later, it is calculated from the current day's 3-hourly forecast.
 - Wind speed is represented by the average of the minimum and maximum values of the wind speed range specified in the bulletin, in m/s. The original minimum and maximum values are available as attributes.
 - Sunset detection uses `sun.sun` for the current state of the weather entity. For `forecast_hourly`, a simplified time-based rule is used: 6:00 PM to 6:00 AM.
-- The list of regions and Prefectural Forecast Areas is loaded from the bundled `area.json` file. If JMA revises its forecast area definitions, this file must be updated accordingly.
 - AMeDAS sensors are created only for parameters reported by the selected station at the time of registration (e.g. snow-related sensors are available only at stations in snowy regions). If additional parameters become available later, they will not be retrieved or reflected until the integration is reloaded.
 - If retrieving AMeDAS observations fails, the most recently retrieved values continue to be displayed.
 - The nearest station to home is selected based on straight-line distance among stations that provide temperature observations.

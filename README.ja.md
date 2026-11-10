@@ -84,8 +84,8 @@
 | `datetime` | 予報の対象時刻（ISO 8601） |
 | `weather` | 天気（原文。例：くもり、雨） |
 | `temperature` | 気温（℃） |
-| `temperature_max` | 予想最高気温（℃） |
-| `temperature_min` | 予想最低気温（℃） |
+| `temperature_max` | 最高気温（℃） |
+| `temperature_min` | 最低気温（℃） |
 | `precipitation_probability` | 降水確率（%） |
 | `wind_direction` | 風向（例：西、北西） |
 | `wind_speed_min` | 風速の下限（m/s） |
